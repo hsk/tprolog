@@ -1,0 +1,4 @@
+*.qlf
+*.swp
+.DS_Store
+.claude/

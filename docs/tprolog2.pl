@@ -1,0 +1,61 @@
+:-op(1100,xfx,:::).
+tp(Γ,M,T):-var(M),!,lookup_env(M,T,Γ).
+tp(_,M,int):-integer(M),!.
+tp(_,M,atom):-atom(M),!.
+tp(_,[],T):-unify_types(T,list(_)),!.
+tp(Γ,[H|Tail],T):-!,unify_types(T,list(A)),tp(Γ,H,A),tp(Γ,Tail,list(A)).
+tp(_,M,T):-atom(M),!,(M:::[]->T).
+tp(Γ,M,T):-compound(M),!,M=..[C|Ms],(C:::Ts->T),maplist(tp(Γ),Ms,Ts).
+lookup_env(M,T,[M1:T1|_]):-M==M1,!,unify_types(T,T1).
+lookup_env(M,T,[Elem|_]):-var(Elem),!,Elem=(M:T).
+lookup_env(M,T,[_|Rest]):-lookup_env(M,T,Rest).
+unify_types(T1,T1):-!.
+unify_types(T1,T2):-(T1:::R1),!,unify_types(R1,T2).
+unify_types(T1,T2):-(T2:::R2),!,unify_types(T1,R2).
+unify_types(T1,T2):-compound(T1),compound(T2),!,
+  T1=..[F|Args1],T2=..[F|Args2],maplist(unify_types,Args1,Args2).
+goal(Γ,G):-G=..[P|Ms],(P:::Ts),maplist(tp(Γ),Ms,Ts).
+body(_,true):-!.
+body(Γ,(A,B)):-!,body(Γ,A),body(Γ,B).
+body(Γ,G):-goal(Γ,G).
+check(Γ,(Head:-Body)):-goal(Γ,Head),body(Γ,Body).
+check(Γ,Head):-goal(Γ,Head).
+'[|]':::[A,list(A)]->list(A).
+
+append:::[list(X),list(X),list(X)].
+int:::[int]->expr.
+add:::[expr,expr]->expr.
+mul:::[expr,expr]->expr.
+eval:::[expr,int].
+integer:::[int].
+is:::[int,int].
+(+):::[int,int]->int.
+(*):::[int,int]->int.
+int:::[int]->v.
+env:::list(atom:v).
+clause:::[env,atom,expr]->v.
+ev:::[env,expr,v].
+ev:::[expr,v].
+var:::[atom]->expr.
+abs:::[atom,expr]->expr.
+app:::[expr,expr]->expr.
+(:):::[atom,V]->atom:V.
+member:::[A,list(A)].
+int:::[]->t.
+et:::[expr,t].
+:-begin_tests(check).
+test(test1):-check(_,(append([1],[2],[1,2]):-true)),!.
+test(test2):-check(_,(eval(int(I),I):-integer(I))),!.
+test(test3):-check(_,(eval(add(E1,E2),I):-eval(E1,I1),eval(E2,I2),I is I1+I2)),!.
+test(test4):-check(_,(eval(mul(E1,E2),I):-eval(E1,I1),eval(E2,I2),I is I1*I2)),!.
+test(test5):-check(_,(ev(int(I),int(I)))),!.
+test(test6):-check(_,(ev(_,int(I),int(I)))),!.
+test(test7):-check(_,(ev(Γ,add(E1,E2),int(I)):-ev(Γ,E1,int(I1)),ev(Γ,E2,int(I2)),I is I1+I2)),!.
+test(test8):-check(_,(ev(Γ,mul(E1,E2),int(I)):-ev(Γ,E1,int(I1)),ev(Γ,E2,int(I2)),I is I1*I2)),!.
+test(test9):-check(_,(ev(Γ,var(X),V):-member(X:V,Γ))),!.
+test(test10):-check(_,(ev(Γ,app(E1,E2),I):-ev(Γ,E1,clause(Γ2,X,E)),ev(Γ,E2,V2),ev([X:V2|Γ2],E,I))),!.
+test(test11):-check(_,(ev(Γ,abs(X,E),clause(Γ,X,E)))),!.
+test(test12):-check(_,(et(int(_),int))),!.
+:-end_tests(check).
+:-run_tests.
+:-halt.
