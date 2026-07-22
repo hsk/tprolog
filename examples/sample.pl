@@ -1,4 +1,4 @@
-:- use_module(tprolog).
+:- use_module('../tprolog').
 
 % --- 1. 基本型・演算子定義 ---
 (+)    ::= [int_t, int_t] -> int_t.
