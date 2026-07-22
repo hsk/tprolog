@@ -2,7 +2,7 @@
 
 このディレクトリは、git管理を始める前に行っていた試行錯誤をそのまま残した
 「実験の記録」です。以後はこのディレクトリのファイルを編集せず、変更は
-リポジトリルートの `tprolog_core.pl` とその利用例
+リポジトリルートの `tprolog.pl` とその利用例
 (`sample.pl` / `stlc.pl` / `add.pl`) に対して行い、git のコミット/タグで
 バージョンを追っていきます。
 
@@ -26,9 +26,9 @@
 
 ## 現在の到達点
 
-`tprolog_union12.pl` までの成果を汎用モジュール `tprolog_core.pl`
-(`:- module(tprolog_core, [...])`) として切り出し、`sample.pl` /
+`tprolog_union12.pl` までの成果を汎用モジュール `tprolog.pl`
+(`:- module(tprolog, [...])`) として切り出し、`sample.pl` /
 `stlc.pl`(単純型付きラムダ計算) / `add.pl`(加算のみの最小言語) を
-`:- use_module(tprolog_core).` で利用する形に整理しました。
-今後の変更は `tprolog_core.pl` 側に対して行い、このディレクトリの
+`:- use_module(tprolog).` で利用する形に整理しました。
+今後の変更は `tprolog.pl` 側に対して行い、このディレクトリの
 ファイルは参照専用の記録として扱います。

@@ -1,4 +1,4 @@
-:- use_module(tprolog_core).
+:- use_module(tprolog).
 
 % =====================================================================
 % STLC (Simply Typed Lambda Calculus) を tprolog_core 上に実装する。

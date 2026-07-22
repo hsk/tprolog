@@ -1,4 +1,4 @@
-:- module(tprolog_core, [
+:- module(tprolog, [
     % 演算子の再エクスポート
     op(1200, xfx, ::=),
     op(1200, xfx, :::),
