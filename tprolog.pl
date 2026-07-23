@@ -8,9 +8,12 @@
 
     % 主要述語
     type_check_all/0,
-    check_all_kinds/0,
+    type_check_all/1,
     check_all_kinds/1,
+    check_all_clauses/1,
+    try_check_clause/4,
     check_kind_decl/1,
+    expand_bnf/1,
     check/2,
     tp/3,
     wf_kind/1,
@@ -28,6 +31,7 @@
 :- discontiguous (:::)/2.
 :- dynamic is_kind/1.
 :- dynamic pending_kind_check/3.
+:- dynamic pending_clause_check/3.
 
 % --- サブタイピング (⊢) ---
 _ ⊢ T <: T :- !.
@@ -117,21 +121,55 @@ try_check_kind(K, File, Line, Result) :-
     ( var(Caught) -> Result = ok(K) ; Result = error(K, File, Line, C, W, Wh) ).
 try_check_kind(K, File, Line, error(K, File, Line, unknown, unknown, goal_failed)).
 
-check_all_kinds :-
-    check_all_kinds(Results),
-    forall(member(error(K, File, Line, C, W, Wh), Results),
+% --- 節(clause)の遅延型検証 ---
+% 以前は term_expansion の中で各節をその場(ロード時)に型検査し、
+% 型が合わなければ throw して(その節だけを)ロードから除外していた。
+% しかし相互再帰する述語同士だと、片方の述語シグネチャがまだ
+% 登録されていない時点でもう片方の節がチェックされ、誤って
+% 弾かれることがある(カインドで check_all_kinds を導入したのと
+% 同じ理由)。そこで節のチェックも pending_clause_check に記録するに
+% とどめ、実際の検証は type_check_all/0,1 でまとめて行うようにした。
+% この結果、型が合わない節も(検出はできるが)ロード時には
+% 削除されずデータベースに残る点に注意。
+try_check_clause(Clause, File, Line, Result) :-
+    catch(
+        ( check(_, Clause) -> Result = ok(Clause)
+        ; Result = error(Clause, File, Line, failed)
+        ),
+        Err,
+        Result = error(Clause, File, Line, exception(Err))
+    ), !.
+
+check_all_clauses(Results) :-
+    findall(Result,
+        ( pending_clause_check(Clause, File, Line),
+          try_check_clause(Clause, File, Line, Result)
+        ),
+        Results).
+
+% ロード完了後にまとめてカインド・節の型整合性を検証する。
+% Results は kinds(KindResults)-clauses(ClauseResults) の形。
+type_check_all(kinds(KindResults)-clauses(ClauseResults)) :-
+    check_all_kinds(KindResults),
+    check_all_clauses(ClauseResults).
+
+% 上記をまとめて実行し、結果を1行で報告するだけの簡易版。
+% 利用側のファイルで毎回同じ定型文を書かずに済むようにするための
+% ユーティリティ。
+type_check_all :-
+    type_check_all(kinds(KindResults)-clauses(ClauseResults)),
+    forall(member(error(K, File, Line, C, W, Wh), KindResults),
            format(user_error,
                   "~w:~w: kind error in ~w -- constructor ~w: ~w ~w~n",
-                  [File, Line, K, C, W, Wh])).
-
-% ロード完了後にまとめてカインドの整合性を検証し、結果を1行で
-% 報告するだけの簡易版。利用側のファイルで毎回同じ定型文を
-% 書かずに済むようにするためのユーティリティ。
-type_check_all :-
-    check_all_kinds(Results),
-    ( member(error(_,_,_,_,_,_), Results) ->
-        writeln('Kind check failed!')
-    ;   writeln('All kinds validated successfully!')
+                  [File, Line, K, C, W, Wh])),
+    forall(member(error(Clause, File, Line, Reason), ClauseResults),
+           format(user_error,
+                  "~w:~w: type error in clause ~p (~w)~n",
+                  [File, Line, Clause, Reason])),
+    ( ( member(error(_,_,_,_,_,_), KindResults)
+      ; member(error(_,_,_,_), ClauseResults) ) ->
+        writeln('Type check failed!')
+    ;   writeln('All kinds and clauses validated successfully!')
     ).
 
 wf_kind(T) :- is_kind(K), tp([], T, K), !.
@@ -182,16 +220,16 @@ prolog:error_message(kind_error(Con, Where, What)) --> ['Kind error in construct
 user:term_expansion(A ::= B, []) :-
     expand_bnf(A ::= B).
 
-% 規則節 (Head :- Body) の型検査
+% 規則節 (Head :- Body) は、ロードはそのまま通し、型検査は
+% pending_clause_check に登録するだけにとどめる。実際の検証は
+% type_check_all/0,1 でロード完了後にまとめて行う。
 user:term_expansion((Head :- Body), (Head :- Body)) :-
     typed_clause(Head), !,
-    ( check(_, (Head :- Body)) -> true
-    ; throw(error(type_error(Head), _))
-    ).
+    ( source_location(File, Line) -> true ; File = unknown, Line = unknown ),
+    assertz(pending_clause_check((Head :- Body), File, Line)).
 
-% 単一項 (Head.) の型検査
+% 単一項 (Head.) も同様。
 user:term_expansion(Head, Head) :-
     typed_clause(Head), !,
-    ( check(_, Head) -> true
-    ; throw(error(type_error(Head), _))
-    ).
+    ( source_location(File, Line) -> true ; File = unknown, Line = unknown ),
+    assertz(pending_clause_check(Head, File, Line)).

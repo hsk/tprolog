@@ -33,22 +33,25 @@ typeof(E1+E2,tint):- typeof(E1,tint), typeof(E2,tint).
 ```
 
 実行例は `examples/add.pl`(加算のみの最小言語)、`examples/stlc.pl`(単純型付きラムダ計算)、`examples/sample.pl`(相互再帰する型・述語の例)を参照してください。
+`tprolog.pl` 本体の仕組み自体のテストは `tests/tprolog_tests.pl` にあります。
 
 ```sh
 swipl examples/add.pl
 swipl examples/stlc.pl
 swipl examples/sample.pl
+swipl tests/tprolog_tests.pl
 ```
 
 ## ファイル構成
 
-| ファイル             | 内容                                                                                  |
-|----------------------|---------------------------------------------------------------------------------------|
-| `tprolog.pl`         | 本体です。サブタイピング・型検査・カインドシステムを提供するモジュールです            |
-| `examples/add.pl`    | 加算だけの最小言語です。`(1+2)+(3+4)` を型検査・評価するサンプルです                  |
-| `examples/stlc.pl`   | 単純型付きラムダ計算(STLC)です。`typeof/3` と大ステップ評価器 `eval/3` を持ちます     |
-| `examples/sample.pl` | 相互再帰する型(`nat_even`/`nat_odd`)と述語(`even`/`odd`)の例です                      |
-| `docs/`              | git管理を始める前の試行錯誤の記録です(参照専用、[docs/README.md](docs/README.md)参照) |
+| ファイル                 | 内容                                                                                  |
+|--------------------------|---------------------------------------------------------------------------------------|
+| `tprolog.pl`             | 本体です。サブタイピング・型検査・カインドシステムを提供するモジュールです            |
+| `examples/add.pl`        | 加算だけの最小言語です。`(1+2)+(3+4)` を型検査・評価するサンプルです                  |
+| `examples/stlc.pl`       | 単純型付きラムダ計算(STLC)です。`typeof/3` と大ステップ評価器 `eval/3` を持ちます     |
+| `examples/sample.pl`     | 相互再帰する型(`nat_even`/`nat_odd`)と述語(`even`/`odd`)の例です                      |
+| `tests/tprolog_tests.pl` | `tprolog.pl` 本体の仕組み自体(共用型・カインド・遅延検証)を直接検証するテストです     |
+| `docs/`                  | git管理を始める前の試行錯誤の記録です(参照専用、[docs/README.md](docs/README.md)参照) |
 
 ## 主な仕組み
 
