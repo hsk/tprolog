@@ -1,75 +1,71 @@
 :- use_module('../tprolog').
 
 % =====================================================================
-% STLC (Simply Typed Lambda Calculus) を tprolog_core 上に実装する。
-% ::= で宣言した型・述語シグネチャは、tprolog_core の term_expansion
+% STLC (Simply Typed Lambda Calculus) を tprolog 上に実装する。
+% ::= で宣言した型・述語シグネチャは、tprolog の term_expansion
 % フックによって自動的にカインド登録され、各節は check/2 で
 % (メタレベルの)型検査を受けた上でロードされる。
 % =====================================================================
 
+% --- 関数適用演算子 $ の定義 ---
+:- op(650, yfx, [$]).
+
 % --- 0. Prolog 組み込み述語のシグネチャ(節本体の型検査に必要) ---
-% リストのコンスセル '[|]'(H,T) 自体のシグネチャ。これがないと
-% [X:ArgTy|Γ] のようなリスト値を tenv/env 等のエイリアス越しに
-% 型検査する際、tp/3 が '[|]' の署名を見つけられず失敗する。
 '[|]'  ::= [A,list(A)]->list(A).
 (+)    ::= [int_t, int_t] -> int_t.
 (*)    ::= [int_t, int_t] -> int_t.
 integer::= [_].
 is     ::= [int_t, int_t].
 member ::= [A, list(A)].
+atom   ::= [atom_t].
 (!)    ::= [].
-% 環境の要素 X:Ty / X:V の ':' 演算子のシグネチャ(tenv, env は list(atom_t:_) で
-% これを使うため、節本体での ':' 項のメタ型検査に必要)。
-(:)    ::= [atom_t,V]->atom_t:V.
+x      ::= atom_t.
+(:)    ::= [x,V]->x:V.
 
-% --- 1. STLC の型 (ty) ---
-% | があるので tprolog_core により自動的に kind 登録される。
-ty ::= tint | tbool | (ty->ty).
+% --- 1. STLC の型 (t) ---
+t ::= int | bool | (t->t).
+i ::= int_t.
+% --- 2. STLC の式 (e) ---
+e ::= i | b
+       | e+e
+       | if(e,e,e)
+       | x               % 変数
+       | λ(x:t,e)
+       | e $ e.         % 関数適用 ($)
 
-% --- 2. STLC の式 (term) ---
-term ::= int_t | bool_t
-       | term+term
-       | ite(term,term,term)
-       | var(atom_t)
-       | lam(atom_t,ty,term)
-       | app(term,term).
-
-true  ::= [] -> bool_t.
-false ::= [] -> bool_t.
+true  ::= [] -> b.
+false ::= [] -> b.
 
 % --- 3. 型付け環境・評価環境・値 ---
-tenv ::= list(atom_t:ty).
-env  ::= list(atom_t:v).
-% v は closure(env,atom_t,ty,term) で env を、env は list(atom_t:v) で v を
-% 参照し合う相互再帰的な定義だが、tprolog_core の遅延カインド検証
-% (check_all_kinds) により、全宣言が出揃った後にまとめて解決される。
-v    ::= int_t | bool_t | closure(env,atom_t,ty,term).
+tenv ::= list(x:t).
+env  ::= list(x:v).
+v    ::= i | b | closure(env,x:t,e).
 
 % --- 4. STLC の型検査 (typeof/3) ---
-typeof ::= [term, tenv, ty].
-typeof(I,_,tint):-integer(I).
-typeof(true,_,tbool).
-typeof(false,_,tbool).
-typeof(E1+E2,Γ,tint):-typeof(E1,Γ,tint),typeof(E2,Γ,tint).
-typeof(ite(C,Th,El),Γ,Ty):-typeof(C,Γ,tbool),typeof(Th,Γ,Ty),typeof(El,Γ,Ty).
-typeof(var(X),Γ,Ty):-member(X:Ty,Γ).
-typeof(lam(X,ArgTy,Body),Γ,(ArgTy->ResTy)):-typeof(Body,[X:ArgTy|Γ],ResTy).
-typeof(app(F,A),Γ,ResTy):-typeof(F,Γ,(ArgTy->ResTy)),typeof(A,Γ,ArgTy).
+typeof ::= [e, tenv, t].
+typeof(I,_,int):-integer(I), !.
+typeof(true,_,bool):- !.
+typeof(false,_,bool):- !.
+typeof(E1+E2,Γ,int):- !, typeof(E1,Γ,int), typeof(E2,Γ,int).
+typeof(if(E1,E2,E3),Γ,T):- !, typeof(E1,Γ,bool), typeof(E2,Γ,T), typeof(E3,Γ,T).
+typeof(λ(X:T1,E1),Γ,(T1->T2)):- !, typeof(E1,[X:T1|Γ],T2).
+typeof(E1 $ E2,Γ,T1):- !, typeof(E1,Γ,(T2->T1)), typeof(E2,Γ,T2).
+typeof(X,Γ,T):-atom(X), !, member(X:T,Γ), !.
 
 % --- 5. STLC の評価 (eval/3, 大ステップ意味論) ---
-eval ::= [env, term, v].
-eval(_,I,I):-integer(I).
-eval(_,true,true).
-eval(_,false,false).
-eval(Γ,E1+E2,I):-eval(Γ,E1,I1),eval(Γ,E2,I2),I is I1+I2.
-eval(Γ,ite(C,Th,_),V):-eval(Γ,C,true),!,eval(Γ,Th,V).
-eval(Γ,ite(C,_,El),V):-eval(Γ,C,false),!,eval(Γ,El,V).
-eval(Γ,var(X),V):-member(X:V,Γ).
-eval(Γ,lam(X,Ty,Body),closure(Γ,X,Ty,Body)).
-eval(Γ,app(F,A),V):-
-    eval(Γ,F,closure(Γ2,X,_,Body)),
-    eval(Γ,A,Av),
-    eval([X:Av|Γ2],Body,V).
+eval ::= [env, e, v].
+eval(_,I,I):-integer(I), !.
+eval(_,true,true):- !.
+eval(_,false,false):- !.
+eval(Γ,E1+E2,I):- !, eval(Γ,E1,I1), eval(Γ,E2,I2), I is I1+I2.
+eval(Γ,if(E1,E2,_),V):-eval(Γ,E1,true), !, eval(Γ,E2,V).
+eval(Γ,if(E1,_,E3),V):-eval(Γ,E1,false), !, eval(Γ,E3,V).
+eval(Γ,λ(X:T,E),closure(Γ,X:T,E)):- !.
+eval(Γ,E1 $ E2,V):- !,
+    eval(Γ,E1,closure(Γ2,X:_,E3)),
+    eval(Γ,E2,V2),
+    eval([X:V2|Γ2],E3,V).
+eval(Γ,X,V):-atom(X), !, member(X:V,Γ), !.
 
 % --- 6. ロード完了後のカインド一括検証 ---
 :- check_all_kinds(Results),
@@ -79,16 +75,16 @@ eval(Γ,app(F,A),V):-
    ).
 
 % --- 7. サンプルプログラム ---
-% ite(true, (λx:tint. x+1) 41, 0)
-sample_program(ite(true, app(lam(x,tint,var(x)+1), 41), 0)).
+% if(true, (λx:int. x+1) $ 41, 0)
+sample_program(if(true, λ(x:int,x+1) $ 41, 0)).
 
 % --- 8. テスト ---
 :- begin_tests(stlc).
 
 test(typeof_whole):-
     sample_program(Whole),
-    typeof(Whole,[],Ty),
-    Ty == tint.
+    typeof(Whole,[],T),
+    T == int.
 
 test(eval_whole):-
     sample_program(Whole),
@@ -96,18 +92,16 @@ test(eval_whole):-
     V == 42.
 
 test(wf_kind_arrow_ok):-
-    wf_kind((tint->tbool)).
+    wf_kind((int->bool)).
 
 test(wf_kind_arrow_rejects_unknown_ty):-
-    \+ wf_kind((tint->foo)).
+    \+ wf_kind((int->foo)).
 
-% -/2 は term に対して一切宣言していないので、
-% typeof にこの節を足すと check/2 が「弾く」ことを確認する。
 test(reject_undeclared_minus_clause):-
-    \+ check(_, (typeof(E1-E2,Γ,tint):-typeof(E1,Γ,tint),typeof(E2,Γ,tint))).
+    \+ check(_, (typeof(E1-E2,Γ,int):-typeof(E1,Γ,int),typeof(E2,Γ,int))).
 
 test(reject_ill_typed_application):-
-    \+ typeof(app(lam(x,tint,var(x)), true), [], _).
+    \+ typeof(λ(x:int,x) $ true, [], _).
 
 :- end_tests(stlc).
 

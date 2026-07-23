@@ -12,6 +12,7 @@
 % いけません(同じ型変数を使い回す必要があります)。そのため
 % 環境の要素を mono(Ty)/poly(Ty) の2種類で区別しています。
 % =====================================================================
+:- op(650, yfx, [$]).
 
 % --- 0. Prolog 組み込み述語のシグネチャ(節本体の型検査に必要) ---
 '[|]'     ::= [A,list(A)]->list(A).
@@ -20,38 +21,41 @@ integer   ::= [_].
 is        ::= [int_t, int_t].
 member    ::= [A, list(A)].
 copy_term ::= [_, _].
+atom      ::= [atom_t].
+x         ::= atom_t.
 (!)       ::= [].
-(:)       ::= [atom_t,V]->atom_t:V.
+(:)       ::= [x,V]->x:V.
 
-% --- 1. 型 (ty) ---
-ty ::= tint | tbool | (ty->ty).
+% --- 1. 型 (t) ---
+t ::= int | bool | (t->t).
 
 % --- 2. 式 (term) ---
-term ::= int_t | bool_t
-       | term+term
-       | ite(term,term,term)
-       | var(atom_t)
-       | lam(atom_t,term)
-       | app(term,term)
-       | let(atom_t,term,term).
+i     ::= int_t.
+true  ::= [] -> b.
+false ::= [] -> b.
 
-true  ::= [] -> bool_t.
-false ::= [] -> bool_t.
+e ::= i | b
+    | e+e
+    | if(e,e,e)
+    | x
+    | λ(x,e)
+    | (e $ e)
+    | let(x,e,e).
 
 % --- 3. 型スキームと型付け環境 ---
 % mono(T): ラムダ束縛。単相なので instantiate 時に copy_term しない。
 % poly(T): let束縛。多相なので instantiate 時に copy_term して
 %          参照のたびに独立した型変数のインスタンスを作る。
-tscheme ::= mono(ty) | poly(ty).
-tenv    ::= list(atom_t:tscheme).
+tscheme ::= mono(t) | poly(t).
+tenv    ::= list(x:tscheme).
 
 % --- 4. 型スキームのインスタンス化 (instantiate/2) ---
-% infer/3 の var(X) の節が本体で使うため、infer より先に
+% infer/3 の X の節が本体で使うため、infer より先に
 % シグネチャと節を宣言しておく必要がある
 % (::= 宣言は登録した時点で述語シグネチャとして使えるようになるが、
 %  節本体で呼ぶ述語は、その節が読み込まれる時点で既に
 %  シグネチャが登録済みでなければメタ型検査を通らないため)。
-instantiate ::= [tscheme, ty].
+instantiate ::= [tscheme, t].
 % mono は copy_term せず、同じ型変数をそのまま返す
 % (ラムダの引数が本体内の全ての出現で同じ型になるようにするため)。
 instantiate(mono(T),T):- !.
@@ -60,16 +64,21 @@ instantiate(mono(T),T):- !.
 instantiate(poly(T),T2):- copy_term(T,T2).
 
 % --- 5. let多相の型推論 (infer/3) ---
-infer ::= [tenv, term, ty].
-infer(_,I,tint):- integer(I).
-infer(_,true,tbool).
-infer(_,false,tbool).
-infer(Γ,E1+E2,tint):- infer(Γ,E1,tint), infer(Γ,E2,tint).
-infer(Γ,ite(C,Th,El),Ty):- infer(Γ,C,tbool), infer(Γ,Th,Ty), infer(Γ,El,Ty).
-infer(Γ,var(X),Ty):- member(X:Scheme,Γ), instantiate(Scheme,Ty).
-infer(Γ,lam(X,Body),(ArgTy->ResTy)):- infer([X:mono(ArgTy)|Γ],Body,ResTy).
-infer(Γ,app(F,A),ResTy):- infer(Γ,F,(ArgTy->ResTy)), infer(Γ,A,ArgTy).
-infer(Γ,let(X,E1,Body),Ty):- infer(Γ,E1,T1), infer([X:poly(T1)|Γ],Body,Ty).
+infer ::= [tenv, e, t].
+% X の節(裸のatomを変数として扱う)は、頭部だけを見ると
+% どの節ともユニファイしてしまう(素の変数パターンのため)。
+% Prolog の節インデックスではそれを区別できないので、各節で
+% 自分自身がマッチしたと分かった時点で明示的にカットし、
+% choicepoint が残らないようにしている。
+infer(_,I,int):- integer(I), !.
+infer(_,true,bool):- !.
+infer(_,false,bool):- !.
+infer(Γ,E1+E2,int):- !, infer(Γ,E1,int), infer(Γ,E2,int).
+infer(Γ,if(E1,E2,E3),T):- !, infer(Γ,E1,bool), infer(Γ,E2,T), infer(Γ,E3,T).
+infer(Γ,X,T):- atom(X),!,member(X:Scheme,Γ), instantiate(Scheme,T).
+infer(Γ,λ(X,E),(T1->T2)):- !, infer([X:mono(T1)|Γ],E,T2).
+infer(Γ,E1 $ E2,T1):- !, infer(Γ,E1,T2->T1), infer(Γ,E2,T2).
+infer(Γ,let(X,E1,E2),T2):- !, infer(Γ,E1,T1), infer([X:poly(T1)|Γ],E2,T2).
 
 % --- 6. ロード完了後のカインド一括検証 ---
 :- check_all_kinds(Results),
@@ -82,58 +91,35 @@ infer(Γ,let(X,E1,Body),Ty):- infer(Γ,E1,T1), infer([X:poly(T1)|Γ],Body,Ty).
 % let id = λx.x in if (id true) then (id 1) else 0
 % id を bool と int の両方に適用しており、let多相でなければ通らない。
 sample_let_poly(
-    let(id, lam(x,var(x)),
-        ite(app(var(id),true), app(var(id),1), 0))
+    let(id, λ(x,x),
+    if(id $ true, id $ 1, 0))
 ).
 
 % 同じことを let ではなく通常のラムダ適用でやろうとした版。
 % id は単相にしかならないので、bool と int の両方には使えず失敗する。
-sample_lambda_mono(
-    app(lam(id,
-             ite(app(var(id),true), app(var(id),1), 0)),
-        lam(x,var(x)))
-).
+sample_lambda_mono(λ(id,if(id $ true, id $ 1, 0)) $ λ(x,x)).
 
 % --- 8. テスト ---
 :- begin_tests(let_poly).
 
-test(infer_int):-
-    infer([],1,tint).
-
-test(infer_bool):-
-    infer([],true,tbool).
-
-test(infer_plus):-
-    infer([],1+2,tint).
-
-test(infer_ite):-
-    infer([],ite(true,1,2),tint).
-
-test(infer_lambda_and_app):-
-    infer([],app(lam(x,var(x)+1),41),tint).
-
+test(infer_int):- infer([],1,int).
+test(infer_bool):- infer([],true,bool).
+test(infer_plus):- infer([],1+2,int).
+test(infer_ite):- infer([],if(true,1,2),int).
+test(infer_lambda_and_app):- infer([], λ(x,x+1) $ 41,int).
 % let多相: id を bool にも int にも適用できる。
-test(let_polymorphism_ok):-
-    sample_let_poly(Whole),
-    infer([],Whole,tint).
-
+test(let_polymorphism_ok):- sample_let_poly(Whole), infer([],Whole,int).
 % 通常のラムダ(単相)では、同じことはできず型検査に失敗する。
-test(lambda_is_monomorphic):-
-    sample_lambda_mono(Whole),
-    \+ infer([],Whole,_).
-
+test(lambda_is_monomorphic):- sample_lambda_mono(Whole), \+ infer([],Whole,_).
 % 単相の確認: ラムダの引数を本体内で bool と int の両方に使うと失敗する。
 test(monomorphic_lambda_rejects_mixed_use):-
-    \+ infer([], lam(x, ite(var(x),1,2)+app(var(x),1)), _).
-
-% メタレベルの型検査: term に対して宣言していない (-)/2 を使う節は
+    \+ infer([], λ(x, if(x,1,2)+ (x $ 1)), _).
+% メタレベルの型検査: e に対して宣言していない (-)/2 を使う節は
 % check/2 によってロード時に弾かれることの確認。
 test(reject_undeclared_minus_clause):-
-    \+ check(_, (infer(Γ,E1-E2,tint):-infer(Γ,E1,tint),infer(Γ,E2,tint))).
-
+    \+ check(_, (infer(Γ,E1-E2,int):-infer(Γ,E1,int),infer(Γ,E2,int))).
 % 存在しない変数の参照は失敗する。
-test(reject_unbound_variable):-
-    \+ infer([], var(nope), _).
+test(reject_unbound_variable):- \+ infer([], nope, _).
 
 :- end_tests(let_poly).
 

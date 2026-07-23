@@ -78,6 +78,9 @@ expr ::= int_t | atom_t | expr+expr.
 
 `42` を `int_t(42)` のように包み直す必要はなく、同じ値がそのまま複数の型に適合する点が、タグ付き代数的データ型との大きな違いです。
 
+この型システムを既存の型理論の文脈に位置づけた解説と参考文献は
+[docs/type-system.md](docs/type-system.md) にまとめてあります。
+
 ## ライセンス
 
 MIT Licenseです。詳細は [LICENSE](./LICENSE) を参照してください。
