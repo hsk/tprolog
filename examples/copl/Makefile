@@ -4,3 +4,4 @@ test:
 	swipl CompareNat2.pl
 	swipl CompareNat3.pl
 	swipl EvalNatExp.pl
+	swipl ReduceNatExp.pl
