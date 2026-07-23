@@ -41,6 +41,34 @@ times    ::= [int_t, result_is].
 lessThan ::= [int_t, result_is].
 (⇓)      ::= [e, v].
 
+% --- tok の型 ---
+% トークンの種類。記号・キーワード(+/-/*/</(/)/if/then/else)は、
+% "+"のようなDCG終端記号(1文字の差分リスト要素)としても同じatomが
+% 再利用されるため、個別に tok_type の構成子として登録してしまうと、
+% tp/3 の atom 節が最初に見つかった tok_type の事実にカットしてしまい、
+% 汎用の atom_t としては二度と分類できなくなる(digits/digit の
+% list(atom_t) と噛み合わなくなる)。そのため個々の記号は列挙せず、
+% expr の "atom_t" と同じ「裸の atom_t」パターンで、
+% int(_)/bool(_) 以外の任意のatomを tok_type として受け付ける形にする。
+tok_type ::= int(int_t) | bool(bool_v) | atom_t.
+
+% tok//1 は DCG規則だが、tprolog は非終端記号名にシグネチャが
+% あるものだけ自前で dcg_translate_rule/2 により変換して型検査する
+% (シグネチャの無い digits/digit 以外の DCG規則は従来通り素通しする)。
+% DCGは差分リストを引数として引き回すため、実際のアリティは
+% 元の非終端記号の引数 + 2 (S0, S) になる。
+tok    ::= [tok_type, list(atom_t), list(atom_t)].
+digits ::= [list(atom_t), list(atom_t), list(atom_t)].
+digit  ::= [atom_t, list(atom_t), list(atom_t)].
+% tokens//1 は tok//1 を呼び出してトークン列を作る、tok と同じ形の
+% 差分リストを引き回す再帰的なDCG規則。
+tokens ::= [list(tok_type), list(atom_t), list(atom_t)].
+
+% tok//1 の本体が呼ぶ組み込み述語のシグネチャ。
+code_type    ::= [atom_t, atom_t].
+number_chars ::= [int_t, list(atom_t)].
+(=)          ::= [_, _].
+
 % tokenize
 tokens(Ts) --> " ", tokens(Ts).
 tokens([T|Ts]) --> tok(T), !, tokens(Ts).

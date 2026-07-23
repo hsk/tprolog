@@ -233,3 +233,17 @@ user:term_expansion(Head, Head) :-
     typed_clause(Head), !,
     ( source_location(File, Line) -> true ; File = unknown, Line = unknown ),
     assertz(pending_clause_check(Head, File, Line)).
+
+% DCG規則 (Head --> Body) は、そのままでは差分リストの隠れた引数が
+% 2つ増えるため typed_clause の対象外だが、非終端記号名にシグネチャが
+% 宣言されている(= 型を付けたい)場合だけ、自前で dcg_translate_rule/2 に
+% よる変換を行い、変換後の通常節を pending_clause_check に登録する。
+% シグネチャが無い(型付けしていない)DCG規則は従来通り素通りし、
+% SWI 標準のDCG変換に任せる。
+user:term_expansion((Head --> Body), Translated) :-
+    nonvar(Head), Head \= (_,_),
+    ( Head = (H2,_) -> functor(H2, Name, _) ; functor(Head, Name, _) ),
+    pred_sig(Name, _), !,
+    dcg_translate_rule((Head --> Body), Translated),
+    ( source_location(File, Line) -> true ; File = unknown, Line = unknown ),
+    assertz(pending_clause_check(Translated, File, Line)).
