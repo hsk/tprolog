@@ -32,11 +32,7 @@ eval(I,I):-integer(I).
 eval(E1+E2,I):-eval(E1,I1),eval(E2,I2),I is I1+I2.
 
 % --- 4. ロード完了後のカインド一括検証 ---
-:- check_all_kinds(Results),
-   ( member(error(_,_,_,_,_,_), Results) ->
-       writeln('Kind check failed!')
-   ;   writeln('All kinds validated successfully!')
-   ).
+:- type_check_all.
 
 % --- 5. サンプルプログラム: (1+2)+(3+4) ---
 sample_program((1+2)+(3+4)).

@@ -7,6 +7,7 @@
     op(600,  xfy, <:),
 
     % 主要述語
+    type_check_all/0,
     check_all_kinds/0,
     check_all_kinds/1,
     check_kind_decl/1,
@@ -122,6 +123,16 @@ check_all_kinds :-
            format(user_error,
                   "~w:~w: kind error in ~w -- constructor ~w: ~w ~w~n",
                   [File, Line, K, C, W, Wh])).
+
+% ロード完了後にまとめてカインドの整合性を検証し、結果を1行で
+% 報告するだけの簡易版。利用側のファイルで毎回同じ定型文を
+% 書かずに済むようにするためのユーティリティ。
+type_check_all :-
+    check_all_kinds(Results),
+    ( member(error(_,_,_,_,_,_), Results) ->
+        writeln('Kind check failed!')
+    ;   writeln('All kinds validated successfully!')
+    ).
 
 wf_kind(T) :- is_kind(K), tp([], T, K), !.
 

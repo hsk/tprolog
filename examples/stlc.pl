@@ -68,11 +68,7 @@ eval(Γ,E1 $ E2,V):- !,
 eval(Γ,X,V):-atom(X), !, member(X:V,Γ), !.
 
 % --- 6. ロード完了後のカインド一括検証 ---
-:- check_all_kinds(Results),
-   ( member(error(_,_,_,_,_,_), Results) ->
-       writeln('Kind check failed!')
-   ;   writeln('All kinds validated successfully!')
-   ).
+:- type_check_all.
 
 % --- 7. サンプルプログラム ---
 % if(true, (λx:int. x+1) $ 41, 0)

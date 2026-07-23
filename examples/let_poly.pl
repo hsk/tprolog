@@ -81,11 +81,7 @@ infer(Γ,E1 $ E2,T1):- !, infer(Γ,E1,T2->T1), infer(Γ,E2,T2).
 infer(Γ,let(X,E1,E2),T2):- !, infer(Γ,E1,T1), infer([X:poly(T1)|Γ],E2,T2).
 
 % --- 6. ロード完了後のカインド一括検証 ---
-:- check_all_kinds(Results),
-   ( member(error(_,_,_,_,_,_), Results) ->
-       writeln('Kind check failed!')
-   ;   writeln('All kinds validated successfully!')
-   ).
+:- type_check_all.
 
 % --- 7. サンプルプログラム ---
 % let id = λx.x in if (id true) then (id 1) else 0

@@ -23,11 +23,7 @@ even(odd_succ(O)) :- odd(O).
 odd(even_succ(E)) :- even(E).
 
 % --- 4. ロード完了後のカインド一括検証 ---
-:- check_all_kinds(Results),
-   ( member(error(_,_,_,_,_,_), Results) ->
-       writeln('Kind check failed!')
-   ;   writeln('All kinds validated successfully!')
-   ).
+:- type_check_all.
 
 % --- 5. サンプル実行プログラム ---
 run :-
