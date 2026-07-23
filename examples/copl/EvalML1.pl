@@ -41,6 +41,19 @@ times    ::= [int_t, result_is].
 lessThan ::= [int_t, result_is].
 (⇓)      ::= [e, v].
 
+% --- UI (code_result/2, test/2) の型 ---
+% phrase/2 は第1引数が「呼び出す非終端記号を表すデータ」
+% (reified call)であり、tp/3 は tokens(Tokens) のような値を
+% 構成子(kindの一種)として型付けしようとして必ず失敗してしまう
+% (tokens は述語シグネチャとして登録されているだけで、構成子としての
+%  事実 tokens:::Args->結果型 が存在しないため)。そのため phrase/2 は
+% 使わず、DCG変換後の3引数の述語として tokens/expr を直接呼ぶ形にする。
+% string_chars/2 の第1引数はSWIのstringオブジェクトで、tp/3 に対応する
+% 節が無い(atomでもリストでもcompoundでもない)ため、汎用にする。
+string_chars ::= [_, list(atom_t)].
+code_result  ::= [list(atom_t), v].
+test         ::= [_, v].
+
 % --- tok の型 ---
 % トークンの種類。記号・キーワード(+/-/*/</(/)/if/then/else)は、
 % "+"のようなDCG終端記号(1文字の差分リスト要素)としても同じatomが
@@ -67,7 +80,22 @@ tokens ::= [list(tok_type), list(atom_t), list(atom_t)].
 % tok//1 の本体が呼ぶ組み込み述語のシグネチャ。
 code_type    ::= [atom_t, atom_t].
 number_chars ::= [int_t, list(atom_t)].
-(=)          ::= [_, _].
+% (=)/2 は両辺が同じ型でなければならないので、独立した2つの無名変数
+% [_,_] ではなく、同じ変数 [X,X] を共有させる。[_,_] のままだと
+% 片方の型(例えばS0のlist(tok_type))がもう片方の型検査に伝播せず、
+% int/bool のように複数のkindの構成子になっている値の判定で、
+% 意図しない方のkind(例えばtok_typeではなくe)にたまたま解決されて
+% しまい、型エラーになることがある。
+(=)          ::= [X, X].
+
+% expr/expr1/term/term1/factor は tokens//1 の出力(トークン列)を
+% 読んで式 e を組み立てるDCG規則。tok//1 系とは異なり、差分リストは
+% 文字(atom_t)ではなくトークン(tok_type)の列であることに注意。
+expr   ::= [e, list(tok_type), list(tok_type)].
+expr1  ::= [e, e, list(tok_type), list(tok_type)].
+term   ::= [e, list(tok_type), list(tok_type)].
+term1  ::= [e, e, list(tok_type), list(tok_type)].
+factor ::= [e, list(tok_type), list(tok_type)].
 
 % tokenize
 tokens(Ts) --> " ", tokens(Ts).
@@ -167,13 +195,19 @@ _I1 lessThan _I2 is false.
 :- type_check_all.
 
 % UI
+% phrase/2 は使わず、DCG変換後の3引数の述語として直接呼ぶ
+% (tokens(Tokens,Code,[]) は phrase(tokens(Tokens),Code) と同じ意味)。
 code_result(Code, Result) :-
-    phrase(tokens(Tokens), Code),
-    phrase(expr(E), Tokens),
+    tokens(Tokens, Code, []),
+    expr(E, Tokens, []),
     E ⇓ Result, !.
 test(String, Result):-
     string_chars(String, Chars),
     code_result(Chars, Result).
+
+% code_result/test は type_check_all の後で定義したので、
+% ここでもう一度呼んでまとめて検証する。
+:- type_check_all.
 :- begin_tests(eval_ml1).
     test(1):- test("42", 42).
     test(2):- test("1 + 2", 3).

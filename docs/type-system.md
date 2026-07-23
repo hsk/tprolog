@@ -58,6 +58,18 @@ Mercury のようなタグ付き多相型システムの起源として、しば
 - Somogyi, Z., Henderson, F., & Conway, T. (1996). *"The execution algorithm of Mercury: an efficient purely declarative logic programming language."* Journal of Logic Programming 29(1-3).
   Mercury 自体の型・モード・決定性システムを含む処理系全体の解説です。
 
+## 既知の限界: 高階述語(phrase/2 など)は型付けできない
+
+`tprolog.pl` は DCG規則(`-->`)自体は自前で `dcg_translate_rule/2` により変換して型付けできる(`examples/copl/EvalML1.pl` の `tok`/`tokens`/`expr` などで実施済み)。
+しかし `phrase(tokens(Tokens), Code)` のように、非終端記号を **reified call**(データとして再構成した呼び出し)として `phrase/2` に渡す形は型付けできない。
+
+`tp/3` がその値(`tokens(Tokens)`)を構成子(kind)として型付けしようとして必ず失敗するためである。
+`tokens` は述語シグネチャ(`tokens ::: [Args...]` という引数型リストの形)として登録されているだけで、構成子としての事実(`tokens ::: Args->結果型` という矢印の形)が存在しない。
+同じ名前が「呼び出せる述語」と「`phrase` に渡すデータ」の二重の役割を持ってしまうのが根本原因で、`tprolog` の型システムには「呼び出し可能な値(callable)」を表現する概念が無いことに起因する。
+
+現状の回避策は、`phrase/2` を使わず、DCG変換後の3引数の述語として `tokens(Tokens, Code, [])` のように直接呼ぶ形に書き換えることである(`code_result/2` で実施済み)。
+callable型のサポート(あるいは `phrase/2` の特別扱い)は今後の課題として残っている。
+
 ## まとめ
 
 「**タグなし構造的共用型による部分型付けに、λProlog由来の簡易カインドシステムを組み合わせたもの**」と言えます。
