@@ -155,3 +155,25 @@ let id = fun x -> x in id id : bool -> bool
 ?- infer("let k = fun x -> fun y -> x in k", W).
 W = "ab.a->b->a" .
 ```
+
+## 14. EvalContML1.pl
+
+継続渡し形式(CPS)で EvalML1 相当の言語(整数演算・if式)を評価する実装です。継続を「フレームの積み重ね」(`>>`)として表現し、式を継続とともに評価する形(`e >> k`)と、値を継続へ渡す形(`v => k`)を判別しながら評価します。
+
+例）
+
+```ocaml
+1 + 2 >> _ evalto 3
+```
+
+## 15. EvalLazyML3.pl / EvalML3-Lazy.pl
+
+EvalML3 相当の言語(再帰関数)を遅延評価(call-by-need)で評価する実装です。関数適用の引数を `thunk(環境, 式)` として遅延させ、実際に値が必要になった時点で `force` して評価します。2つのファイルは同一内容です(plunit のテストユニット名のみ異なります)。
+
+例）
+
+```ocaml
+let rec f = fun x -> f x + f x in let zero = fun y -> 0 in zero (f 3)
+```
+
+このコードは通常の評価(先行評価)では `f` が無限に自己適用されて止まりませんが、遅延評価では `zero` が引数を一度も使わないため、評価されずに `0` を返します。
