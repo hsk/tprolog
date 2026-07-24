@@ -67,10 +67,14 @@ lookup_env(M, T, [M1:T1|_]) :- M == M1, !, ([] ⊢ T <: T1 -> true ; [] ⊢ T1 <
 lookup_env(M, T, [_|Rest])  :- lookup_env(M, T, Rest).
 
 % --- 述語シグネチャ取得 ---
-pred_sig(P, Ts) :- (P ::: Ts), is_list(Ts), !.
-pred_sig(P, Ts) :- (P ::: Target), !, Target \= (_ -> _), pred_sig(Target, Ts).
+% 同じ述語名に対して複数の引数リスト形式シグネチャが登録されている
+% 場合(オーバーロード)、goal/2 が maplist で実際に検査してみて
+% 失敗したら次の候補にバックトラックできるよう、ここでは内部で
+% カットせず全候補を列挙可能にしておく(match_sig と同じ設計)。
+pred_sig(P, Ts) :- (P ::: Ts), is_list(Ts).
+pred_sig(P, Ts) :- (P ::: Target), \+ is_list(Target), Target \= (_ -> _), pred_sig(Target, Ts).
 
-goal(Γ, G) :- G =.. [P|Ms], pred_sig(P, Ts), maplist(tp(Γ), Ms, Ts).
+goal(Γ, G) :- G =.. [P|Ms], pred_sig(P, Ts), maplist(tp(Γ), Ms, Ts), !.
 
 body(_, true) :- !.
 body(Γ, (A, B)) :- !, body(Γ, A), body(Γ, B).
