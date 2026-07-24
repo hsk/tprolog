@@ -6,32 +6,25 @@
 
 ## 使い方
 
+各ファイルは tprolog による型検査と、plunit によるテスト一式の実行までを行うようになっているので、実行するだけで動作を確認できます。
+
 1. SWI-Prolog をインストールする
-2. 各章に対応したプログラムを起動する
+2. 各章に対応したプログラムを実行する(型検査とテストが自動で走り、終わると終了する)
   例）EvalML4
 
   ```bash
   $ swipl EvalML4.pl
+  All kinds and clauses validated successfully!
+  All kinds and clauses validated successfully!
+  % Start unit: eval_ml4
+  % [1/25] eval_ml4:1 ..42 => 42
+  ..................................................... passed (0.001 sec)
+  ...
+  % End unit eval_ml4: passed (0.006 sec CPU)
+  % All 25 tests passed in 0.017 seconds (0.009 cpu)
   ```
 
-3. プロンプトで以下のようにコードを実行する
-
-  ```ocaml
-  ?- test("let x = 1 in x + 2", W).
-  let x = 1 in x + 2 => 3
-  W = 3.
-  ```
-
-4. またはテスト一式を実行する
-
-  ```ocaml
-  ?- tests.
-  ..
-  let x = 1 in x + 2 => 3
-  let rec fib = fun n -> if n < 2 then n else fib (n - 1) + fib (n - 2) in fib 10 => 55
-  ..
-  true
-  ```
+個別にコードを試したい場合は、対話環境で `code_result/2`(または `test/2`)を直接呼び出すこともできます。
 
 ## 1. Nat.pl
 

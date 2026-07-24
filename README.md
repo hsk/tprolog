@@ -35,6 +35,8 @@ typeof(E1+E2,tint):- typeof(E1,tint), typeof(E2,tint).
 実行例は `examples/add.pl`(加算のみの最小言語)、`examples/stlc.pl`(単純型付きラムダ計算)、`examples/sample.pl`(相互再帰する型・述語の例)を参照してください。
 `tprolog.pl` 本体の仕組み自体のテストは `tests/tprolog_tests.pl` にあります。
 
+より大きな実例として、`examples/copl/` に書籍『プログラミング言語の基礎概念』の演習で登場する評価器・型システムの実装一式(整数式から始まり、let/関数定義、再帰、リストとパターンマッチ、単相/多相の型システム、継続渡し形式(CPS)評価、遅延評価まで)を型付けしてあります。詳細は [examples/copl/README.md](examples/copl/README.md) を参照してください。
+
 ```sh
 swipl examples/add.pl
 swipl examples/stlc.pl
@@ -50,6 +52,7 @@ swipl tests/tprolog_tests.pl
 | `examples/add.pl`        | 加算だけの最小言語です。`(1+2)+(3+4)` を型検査・評価するサンプルです                  |
 | `examples/stlc.pl`       | 単純型付きラムダ計算(STLC)です。`typeof/3` と大ステップ評価器 `eval/3` を持ちます     |
 | `examples/sample.pl`     | 相互再帰する型(`nat_even`/`nat_odd`)と述語(`even`/`odd`)の例です                      |
+| `examples/copl/`         | 書籍『プログラミング言語の基礎概念』の演習の型付き実装一式です([examples/copl/README.md](examples/copl/README.md)参照) |
 | `tests/tprolog_tests.pl` | `tprolog.pl` 本体の仕組み自体(共用型・カインド・遅延検証)を直接検証するテストです     |
 | `tests/dcg_tests.pl`     | DCG規則(`-->`)の型検査対応を直接検証するテストです                                    |
 | `tests/list_tests.pl`    | リスト値(`list(A)`エイリアス)と述語シグネチャのオーバーロード(`pred_sig`/`goal`)を直接検証するテストです |
