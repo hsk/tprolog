@@ -91,6 +91,63 @@ factor  ::= [e, list(tok_type), list(tok_type)].
 factor1 ::= [e, e, list(tok_type), list(tok_type)].
 farg    ::= [e, list(tok_type), list(tok_type)].
 
+% --- 評価の型 (EvalML3.pl + パターンマッチのリスト値) ---
+% 値: 整数・真偽値、クロージャ(通常/letrec)。
+v ::= int_t | bool_v | cls(env, fun_abs) | cls(env, binding).
+
+% match/nil/:: の評価結果は [] や [V1|V2] という素の Prolog リストで
+% 表現される(v のリスト)。`v ::= ... | list(v).` のように v 自身の
+% 選択肢に list(v) を混ぜると、alts/3 が list(v) を単に「list という
+% 名前の構成子(引数 v)」として登録してしまい(list:::[v]->v)、
+% 肝心の「list(A) という型表現へのエイリアス」情報が失われる
+% (tp/3 の空リスト/consリスト専用節 tp(_,[],T) や
+%  tp(Γ,[H|Tail],list(A)) は、ターゲット型が構文的に list(A) の
+%  形をしている場合にしか反応しないため)。
+% そのため vlist という別カインドを単一選択肢(env と同じ「真の
+% 型エイリアス」扱い)で用意し、list(v) というエイリアスを維持する。
+vlist ::= list(v).
+
+% 評価環境 C は (変数名 = 値) のペアのリスト。値は match の
+% x :: y パターンで y がリスト全体(vlist)に束縛されることがあるので、
+% v と vlist の2択にする(eval_pair と同じ理由)。
+env_binding ::= (list(atom_t) = v) | (list(atom_t) = vlist).
+env ::= list(env_binding).
+
+% 'C ⱶ E ⇩ V' は実際には ⱶ(C, ⇩(E,V)) という項になるので、
+% ⇩(e,v) の形を eval_pair としてカインド登録しておく。V は
+% スカラー(v)またはリスト(vlist)のどちらもありうるので2択にする。
+eval_pair ::= (e ⇩ v) | (e ⇩ vlist).
+
+% plus/minus/times/lessThan は 'I1 plus I2 is I3' という中置記法で
+% 書かれているが、plus 等(800,xfx) は is(700,xfx) より優先順位の
+% 数値が小さい(=強く結合する)ため、実際には
+%   plus(I1, is(I2,I3))
+% という項に展開される。結果型を汎用の _V で受け付ける。
+result_is ::= is(int_t, _V).
+
+(+)      ::= [int_t,int_t] -> int_t.
+(-)      ::= [int_t,int_t] -> int_t.
+(*)      ::= [int_t,int_t] -> int_t.
+is       ::= [int_t,int_t].
+(<)      ::= [int_t,int_t].
+plus     ::= [int_t, result_is].
+minus    ::= [int_t, result_is].
+times    ::= [int_t, result_is].
+lessThan ::= [int_t, result_is].
+(ⱶ)      ::= [env, eval_pair].
+(\==)    ::= [X, X].
+
+% --- UI (code_result/2 等) の型 ---
+% string_chars/2 の第1引数はSWIのstringオブジェクトで、tp/3 に対応する
+% 節が無い(atomでもリストでもcompoundでもない)ため、汎用にする。
+string_chars ::= [_, list(atom_t)].
+code_result  ::= [list(atom_t), v].
+code_expr    ::= [list(atom_t), e].
+code_tokens  ::= [list(atom_t), list(tok_type)].
+% test は writef/2 に list(atom_t) と v が混在する引数リストを渡すため、
+% tprolog の list(A)(同種要素のみ)では型付けできない(EvalML2.pl参照)。
+% そのためシグネチャを与えず、型検査の対象外(untyped)のままにする。
+
 % tokenize
 tokens(Ts) --> " ", tokens(Ts).
 tokens([T|Ts]) --> tok(T), !, tokens(Ts).
@@ -313,21 +370,33 @@ I1 times I2 is I3 :-
 % (b3 = i1 < i2)
 % ---------------- B-LessThan
 % i1 less than i2 is b3
-I1 lessThan I2 is B :-
-     I1 < I2 -> B = true; B = false.
+% 元々は 'I1 < I2 -> B = true; B = false.' という if-then-else で
+% 書かれていたが、tprolog のメタ型検査(body/2)は ','/2 と true しか
+% 特別扱いしないため、->/;/= を含む節はそのままでは型検査できない。
+% 全く同じ挙動になる、2節+カットの形に書き換えている。
+I1 lessThan I2 is true :- I1 < I2, !.
+_I1 lessThan _I2 is false.
 
 % UI
+% phrase/2 は使わず、DCG変換後の3引数の述語として直接呼ぶ
+% (tokens(Tokens,Code,[]) は phrase(tokens(Tokens),Code) と同じ意味。
+%  phrase/2 は非終端記号を reified call として渡す高階述語で、
+%  tprolog はcallableという概念を持たないため型付けできない)。
 code_result(Code, Result) :-
-    phrase(tokens(Tokens), Code),
-    phrase(expr(Expr), Tokens),
+    tokens(Tokens, Code, []),
+    expr(Expr, Tokens, []),
     [] ⱶ Expr ⇩ Result, !.
 
 code_expr(Code, Expr) :-
-    phrase(tokens(Tokens), Code),
-    phrase(expr(Expr), Tokens).
+    tokens(Tokens, Code, []),
+    expr(Expr, Tokens, []).
 
 code_tokens(Code, Tokens) :-
-    phrase(tokens(Tokens), Code).
+    tokens(Tokens, Code, []).
+
+% code_result/code_expr/code_tokens は type_check_all の後で
+% 定義したので、ここでもう一度呼んでまとめて検証する。
+:- type_check_all.
 
 % test
 % test内(:-begin_tests/:-end_testsの中)ではdouble_quotes=charsが
