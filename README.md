@@ -51,6 +51,8 @@ swipl tests/tprolog_tests.pl
 | `examples/stlc.pl`       | 単純型付きラムダ計算(STLC)です。`typeof/3` と大ステップ評価器 `eval/3` を持ちます     |
 | `examples/sample.pl`     | 相互再帰する型(`nat_even`/`nat_odd`)と述語(`even`/`odd`)の例です                      |
 | `tests/tprolog_tests.pl` | `tprolog.pl` 本体の仕組み自体(共用型・カインド・遅延検証)を直接検証するテストです     |
+| `tests/dcg_tests.pl`     | DCG規則(`-->`)の型検査対応を直接検証するテストです                                    |
+| `tests/list_tests.pl`    | リスト値(`list(A)`エイリアス)と述語シグネチャのオーバーロード(`pred_sig`/`goal`)を直接検証するテストです |
 | `docs/`                  | git管理を始める前の試行錯誤の記録です(参照専用、[docs/README.md](docs/README.md)参照) |
 
 ## 主な仕組み
